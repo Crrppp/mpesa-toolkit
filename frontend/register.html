@@ -1,0 +1,45 @@
+<!-- frontend/register.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Business</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: Arial; background: #0f172a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .card { background: #1e293b; padding: 30px; border-radius: 12px; width: 350px; color: white; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 8px; background: #334155; color: white; }
+        button { width: 100%; padding: 12px; background: #3b82f6; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Register Business</h2>
+        <input type="text" id="businessName" placeholder="Business Name">
+        <input type="text" id="accountNumber" placeholder="Till/Paybill number">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="register()">Register</button>
+        <p id="result"></p>
+        <p style="margin-top:10px;"><a href="login.html" style="color:#3b82f6;">Already have account?</a></p>
+    </div>
+    <script src="js/api.js"></script>
+    <script>
+        async function register() {
+            const name = document.getElementById('businessName').value;
+            const acc = document.getElementById('accountNumber').value;
+            const pass = document.getElementById('password').value;
+            try {
+                const data = await apiCall('/api/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ business_name: name, account_number: acc, password: pass })
+                });
+                document.getElementById('result').textContent = 'Registered! Redirecting...';
+                setTimeout(() => window.location.href = 'login.html', 1500);
+            } catch(e) {
+                document.getElementById('result').textContent = e.message;
+            }
+        }
+    </script>
+</body>
+</html>

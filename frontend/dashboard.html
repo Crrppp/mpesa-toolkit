@@ -1,0 +1,201 @@
+<!-- frontend/dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M-Pesa Dashboard</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; margin: 20px; background: #0f172a; color: #e2e8f0; }
+        .sidebar {
+            height: 100%;
+            width: 220px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #1e293b;
+            padding: 20px;
+            overflow: auto;
+        }
+        .sidebar a {
+            color: #94a3b8;
+            text-decoration: none;
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+        }
+        .sidebar a.active, .sidebar a:hover { background: #334155; color: #fff; }
+        .main {
+            margin-left: 240px;
+            padding: 20px;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #0f172a; }
+        .btn { padding: 10px 16px; border: none; border-radius: 8px; background: #3b82f6; color: white; cursor: pointer; }
+        .btn:hover { background: #2563eb; }
+        .hidden { display: none; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+        .modal-content { background: #1e293b; padding: 20px; border-radius: 12px; max-width: 500px; width: 90%; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>M-Pesa Pro</h2>
+        <a href="#" class="active" onclick="showSection('transactions')">📊 Transactions</a>
+        <a href="#" onclick="showSection('sendMoney')">💸 Send Money</a>
+        <a href="#" onclick="showSection('importStatement')">📄 Import Statement</a>
+        <a href="#" onclick="showSection('settings')">⚙️ Settings</a>
+        <a href="#" onclick="showSection('analytics')">📈 Analytics</a>
+        <a href="#" onclick="logout()">🚪 Logout</a>
+    </div>
+    <div class="main" id="mainContent">
+        <!-- Dynamic sections -->
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const user = getUser();
+        if (!user) window.location.href = '/login.html';
+
+        const sections = {
+            transactions: `
+                <div class="card"><h3>Transaction History</h3>
+                <input type="date" id="dateFrom"> <input type="date" id="dateTo">
+                <button class="btn" onclick="loadTxns()">Filter</button>
+                <button class="btn" onclick="downloadPDF()">📥 PDF Statement</button>
+                <table id="txnTable"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Phone</th><th>Reference</th></tr></thead><tbody></tbody></table></div>`,
+            sendMoney: `
+                <div class="card"><h3>Send Money (B2C)</h3>
+                <input type="text" id="recipientPhone" placeholder="2547XXXXXXX">
+                <input type="number" id="sendAmount" placeholder="Amount">
+                <button class="btn" onclick="sendB2C()">Send</button>
+                <p id="b2cResult"></p></div>`,
+            importStatement: `
+                <div class="card"><h3>Import M-Pesa Statement PDF</h3>
+                <input type="file" id="pdfFile" accept=".pdf">
+                <input type="text" id="pdfPassword" placeholder="PDF password">
+                <button class="btn" onclick="uploadPDF()">Upload & Process</button>
+                <div id="uploadProgress" class="hidden"><progress value="0" max="100"></progress></div>
+                <p id="uploadResult"></p></div>`,
+            settings: `
+                <div class="card"><h3>Daraja API Keys (for B2C & callbacks)</h3>
+                <p>If you want to enable direct send money, paste your Daraja Consumer Key & Secret.</p>
+                <input type="text" id="consumerKey" placeholder="Consumer Key">
+                <input type="password" id="consumerSecret" placeholder="Consumer Secret">
+                <button class="btn" onclick="saveDarajaKeys()">Save Keys</button>
+                <p id="keysResult"></p></div>`,
+            analytics: `
+                <div class="card"><h3>Advanced Analytics</h3>
+                <button class="btn" onclick="loadMetabase()">Open Analytics Dashboard</button>
+                <iframe id="metabaseFrame" style="width:100%; height:600px; border:none; margin-top:10px;" class="hidden"></iframe></div>`
+        };
+
+        function showSection(name) {
+            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('mainContent').innerHTML = sections[name];
+            if (name === 'transactions') loadTxns();
+        }
+
+        async function loadTxns() {
+            const from = document.getElementById('dateFrom')?.value || '';
+            const to = document.getElementById('dateTo')?.value || '';
+            const txns = await apiCall(`/api/transactions?from=${from}&to=${to}`);
+            const tbody = document.querySelector('#txnTable tbody');
+            tbody.innerHTML = txns.map(t => `<tr><td>${new Date(t.timestamp).toLocaleString()}</td><td>${t.transaction_type}</td><td>${t.amount}</td><td>${t.phone_number}</td><td>${t.account_reference}</td></tr>`).join('');
+        }
+
+        async function downloadPDF() {
+            const from = document.getElementById('dateFrom')?.value || '';
+            const to = document.getElementById('dateTo')?.value || '';
+            const blob = await fetch(`${API_BASE}/api/statements/pdf?from=${from}&to=${to}`, {
+                headers: { Authorization: `Bearer ${getToken()}` }
+            }).then(r => r.blob());
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'statement.pdf';
+            a.click();
+        }
+
+        async function sendB2C() {
+            const phone = document.getElementById('recipientPhone').value;
+            const amount = document.getElementById('sendAmount').value;
+            try {
+                const res = await apiCall('/api/b2c/send', {
+                    method: 'POST',
+                    body: JSON.stringify({ phone_number: phone, amount: parseFloat(amount) })
+                });
+                document.getElementById('b2cResult').textContent = 'Payment initiated: ' + JSON.stringify(res);
+            } catch(e) {
+                document.getElementById('b2cResult').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function uploadPDF() {
+            const file = document.getElementById('pdfFile').files[0];
+            const password = document.getElementById('pdfPassword').value;
+            if (!file) return alert('Select a PDF');
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('password', password);
+            const res = await fetch(`${API_BASE}/api/statements/upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${getToken()}` },
+                body: formData
+            }).then(r => r.json());
+            document.getElementById('uploadResult').textContent = 'Task ID: ' + res.task_id;
+            // Poll task status
+            const interval = setInterval(async () => {
+                const status = await apiCall(`/api/tasks/${res.task_id}`);
+                const prog = document.getElementById('uploadProgress');
+                prog.classList.remove('hidden');
+                prog.querySelector('progress').value = status.progress || 0;
+                if (status.state === 'SUCCESS') {
+                    clearInterval(interval);
+                    document.getElementById('uploadResult').textContent = 'Imported ' + status.result?.imported + ' transactions';
+                } else if (status.state === 'FAILURE') {
+                    clearInterval(interval);
+                    document.getElementById('uploadResult').textContent = 'Failed: ' + status.error;
+                }
+            }, 2000);
+        }
+
+        async function saveDarajaKeys() {
+            const ck = document.getElementById('consumerKey').value;
+            const cs = document.getElementById('consumerSecret').value;
+            try {
+                await apiCall('/api/business/daraja-keys', {
+                    method: 'POST',
+                    body: JSON.stringify({ consumer_key: ck, consumer_secret: cs })
+                });
+                document.getElementById('keysResult').textContent = 'Keys saved securely.';
+            } catch(e) {
+                document.getElementById('keysResult').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        function loadMetabase() {
+            const frame = document.getElementById('metabaseFrame');
+            frame.classList.remove('hidden');
+            apiCall('/api/metabase/sso').then(data => {
+                frame.src = data.iframe_url;
+            }).catch(e => alert('Metabase not available'));
+        }
+
+        // Init
+        showSection('transactions');
+    </script>
+</body>
+</html>

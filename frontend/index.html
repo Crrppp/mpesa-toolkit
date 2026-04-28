@@ -1,0 +1,246 @@
+    <!-- frontend/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M-Pesa Toolkit - QR & USSD</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 24px; margin-bottom: 8px; text-align: center; }
+        .subtitle { text-align: center; color: rgba(255,255,255,0.7); margin-bottom: 24px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; }
+        input, select {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            font-size: 16px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        input::placeholder { color: rgba(255,255,255,0.5); }
+        input:focus, select:focus { outline: none; border-color: #4CAF50; }
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: 0.3s;
+        }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-primary:hover { background: #45a049; }
+        .result-container {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin: 24px 0;
+            text-align: center;
+            display: none;
+        }
+        .result-container.show { display: block; }
+        #qrcode { min-height: 200px; display: flex; justify-content: center; align-items: center; }
+        .ussd-link {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 40px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        .info-box {
+            background: rgba(255,255,255,0.1);
+            border-left: 4px solid #2196F3;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .info-box strong { display: block; margin-bottom: 8px; color: #4CAF50; }
+        .offline-banner { background: #ff9800; color: black; text-align: center; padding: 8px; display: none; }
+        .offline-banner.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="offline-banner" id="offlineBanner">📴 Offline mode. QR generation still works!</div>
+    <div class="container">
+        <h1>📱 M-Pesa Toolkit</h1>
+        <p class="subtitle">Generate QR codes & USSD shortcuts</p>
+
+        <form id="transactionForm">
+            <div class="form-group">
+                <label>Transaction Type</label>
+                <select id="txnType" required>
+                    <option value="till">Buy Goods (Till Number)</option>
+                    <option value="paybill">Pay Bill</option>
+                    <option value="send">Send Money</option>
+                    <option value="pochi">Pochi La Biashara</option>
+                    <option value="withdraw">Withdraw Cash (Agent)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label id="numberLabel">Till Number</label>
+                <input type="text" id="accountNumber" placeholder="e.g., 123456" required>
+            </div>
+            <div class="form-group">
+                <label>Name (business/recipient)</label>
+                <input type="text" id="merchantName" placeholder="e.g., Acme Grocers" required>
+            </div>
+            <div class="form-group">
+                <label>Amount (Optional)</label>
+                <input type="text" id="amount" placeholder="Leave blank for customer to enter">
+            </div>
+            <button type="submit" class="btn btn-primary">Generate Shortcut</button>
+        </form>
+
+        <div class="result-container" id="resultContainer">
+            <div id="qrcode"></div>
+            <div id="ussdBox" style="display:none;">
+                <p style="color:#333; margin-bottom:8px;">📞 Tap to dial:</p>
+                <a href="#" id="ussdLink" class="ussd-link"></a>
+            </div>
+            <div id="details" style="margin-top:12px; color:#333; font-size:14px;"></div>
+        </div>
+
+        <div class="button-group" id="actionButtons" style="display:none; grid-template-columns:1fr;">
+            <button class="btn btn-secondary" id="downloadBtn">⬇️ Download QR</button>
+        </div>
+
+        <div class="info-box">
+            <strong>💡 How It Works</strong>
+            <ul style="margin-left:20px; line-height:1.6;">
+                <li><strong>Till/Paybill:</strong> QR code (KE-QR standard)</li>
+                <li><strong>Send/Pochi/Withdraw:</strong> USSD shortcut (opens dialer)</li>
+            </ul>
+        </div>
+        <a href="dashboard.html" class="btn btn-secondary" style="margin-top:20px; text-decoration:none; display:block; text-align:center;">🔐 Business Dashboard</a>
+    </div>
+
+    <script src="js/qr-generator.js"></script>
+    <script>
+        // Service Worker registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
+        // Offline banner
+        window.addEventListener('online', () => document.getElementById('offlineBanner').classList.remove('show'));
+        window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('show'));
+        if (!navigator.onLine) document.getElementById('offlineBanner').classList.add('show');
+
+        const txnType = document.getElementById('txnType');
+        const numberLabel = document.getElementById('numberLabel');
+        const accountInput = document.getElementById('accountNumber');
+
+        function updateLabel() {
+            const labels = { till: 'Till Number', paybill: 'Paybill Number', send: 'Phone Number', pochi: 'Phone Number', withdraw: 'Agent Number' };
+            numberLabel.textContent = labels[txnType.value] || 'Number';
+        }
+        txnType.addEventListener('change', updateLabel);
+        updateLabel();
+
+        // Using embedded QR generator (window.QRCodeGenerator from qr-generator.js)
+        function generateQRCode(data) {
+            return new Promise((resolve) => {
+                const size = 300;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                try {
+                    if (window.QRCodeGenerator) {
+                        QRCodeGenerator.qrCodeToCanvas({ text: data, size: size }, canvas);
+                    } else {
+                        throw new Error('No QR generator');
+                    }
+                    resolve(canvas);
+                } catch (err) {
+                    // Fallback: text display
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, size, size);
+                    ctx.fillStyle = '#000';
+                    ctx.font = '14px monospace';
+                    ctx.fillText('QR Code (offline)', size/2-60, size/2);
+                    resolve(canvas);
+                }
+            });
+        }
+
+        document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const type = txnType.value;
+            const account = accountInput.value.trim();
+            const name = document.getElementById('merchantName').value.trim();
+            const amount = document.getElementById('amount').value.trim();
+
+            const resultDiv = document.getElementById('resultContainer');
+            const qrcodeDiv = document.getElementById('qrcode');
+            const ussdBox = document.getElementById('ussdBox');
+            const ussdLink = document.getElementById('ussdLink');
+            const detailsDiv = document.getElementById('details');
+            const actionButtons = document.getElementById('actionButtons');
+
+            qrcodeDiv.innerHTML = '';
+            ussdBox.style.display = 'none';
+            resultDiv.classList.add('show');
+
+            if (type === 'till' || type === 'paybill') {
+                const qrData = `${account}|${name}|${account}|${type==='till'?'BG':'PB'}${amount?'|'+amount:''}`;
+                const canvas = await generateQRCode(qrData);
+                qrcodeDiv.appendChild(canvas);
+                actionButtons.style.display = 'grid';
+                detailsDiv.innerHTML = `<strong>${name}</strong><br>${type==='till'?'Till':'Paybill'}: ${account}${amount?' | Amount: '+amount:''}`;
+            } else {
+                let ussd = '*334*';
+                if (type === 'send' || type === 'pochi') ussd += `1*1*${account}`;
+                else if (type === 'withdraw') ussd += `2*1*${account}`;
+                if (amount) ussd += `*${amount}`;
+                ussd += encodeURIComponent('#');
+                ussdLink.href = `tel:${ussd}`;
+                ussdLink.textContent = `Dial ${ussd}`;
+                ussdBox.style.display = 'block';
+                actionButtons.style.display = 'none';
+                detailsDiv.innerHTML = `<strong>${name}</strong><br>${type}: ${account}${amount?' | Amount: '+amount:''}`;
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = 'mpesa-qr.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
