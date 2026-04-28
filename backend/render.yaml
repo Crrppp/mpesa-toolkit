@@ -1,0 +1,17 @@
+# backend/render.yaml
+services:
+  - type: web
+    name: mpesa-backend
+    env: python
+    region: frankfurt
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: SECRET_KEY
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: METABASE_SECRET_KEY
+        sync: false
