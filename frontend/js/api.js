@@ -1,12 +1,11 @@
 // frontend/js/api.js
-// Centralized API helper
-const API_BASE = 'https://your-backend.onrender.com'; // Will be replaced during deployment
+const API_BASE = 'https://mpesa-toolkit.onrender.com'; // ← CHANGE THIS TO YOUR RENDER URL
 
 async function apiCall(endpoint, options = {}) {
     const token = localStorage.getItem('token');
     const headers = {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
+        ...(token && { Authorization: `Bearer ${token}` })
     };
     const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     if (!res.ok) {
